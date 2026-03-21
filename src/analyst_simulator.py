@@ -66,7 +66,7 @@ class AnalystSimulator:
             
             # Normalize trust score to prevent negative weights or exploding values
             # We decay it slightly to make recent behavior matter more, and bound it
-            analyst['trust_score'] = max(0.1, min(10.0, analyst['trust_score'] * 0.99))
+            analyst['trust_score'] = max(0.1, min(10.0, analyst['trust_score'] * 0.9999))
             analyst['total_reviews'] += 1
             
             decisions.append(decision)
