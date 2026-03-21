@@ -21,7 +21,8 @@ def generate_alerts(df: pd.DataFrame) -> pd.DataFrame:
     # Identify CASH_OUT and TRANSFER columns
     r3_cols = [c for c in type_cols if 'CASH_OUT' in c or 'TRANSFER' in c]
     if r3_cols:
-        df['R3'] = (df[r3_cols].sum(axis=1) > 0).astype(int)
+        # R3: Flag high-risk types ONLY IF amount > 200,000
+        df['R3'] = ((df[r3_cols].sum(axis=1) > 0) & (df['amount'] > 200_000)).astype(int)
     else:
         # Fallback: if drop_first removed CASH_OUT (alphabetically after CASH_IN),
         # CASH_OUT should still exist. But handle edge case.
@@ -35,8 +36,8 @@ def generate_alerts(df: pd.DataFrame) -> pd.DataFrame:
         df['balance_drop'] / df['oldbalanceOrg'],
         0
     )
-    # Flag where >= 90% of balance was drained
-    df['R4'] = (df['balance_drain_ratio'] >= 0.9).astype(int)
+    # Flag where >= 90% of balance was drained AND amount > 10,000
+    df['R4'] = ((df['balance_drain_ratio'] >= 0.9) & (df['amount'] > 10_000)).astype(int)
     
     # Count how many rules triggered per transaction
     df['rule_count'] = df[['R1','R2','R3','R4']].sum(axis=1)
