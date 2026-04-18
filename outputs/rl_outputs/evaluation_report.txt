@@ -1,0 +1,38 @@
+======================================================================
+RL DECISION OPTIMIZATION EVALUATION REPORT
+======================================================================
+
+DATA SUMMARY:
+  Test Set Size: 615768
+  Fraud Rate: 0.0039
+  Fraud Count: 2377
+
+TRAINED AGENTS:
+
+  DQN:
+    Fraud Catch Rate: 0.9748
+    FP Reduction Rate: 0.9788
+    Workload Savings: 0.9751
+    Avg Episode Reward: 575444.50 (+/-0.00)
+
+  BANDIT:
+    Fraud Catch Rate: 0.9941
+    FP Reduction Rate: 0.0000
+    Workload Savings: 0.0000
+    Avg Episode Reward: -301871.50 (+/-0.00)
+
+POLICY COMPARISON:
+          Policy Parameter  Fraud Catch Rate  FP Reduction Rate  Workload Savings  Avg Reward
+        RL Agent       dqn          0.974758           0.978772          0.975091    575444.5
+Static Threshold      0.80          0.995793           0.958296          0.954613    581854.5
+Static Threshold      0.85          0.995793           0.947032          0.943393    571491.0
+Static Threshold      0.90          0.996214           0.930118          0.926542    556433.5
+Static Threshold      0.95          0.997055           0.885442          0.882035    516337.5
+Static Threshold      0.99          0.997897           0.632644          0.630210    284751.5
+
+RECOMMENDATIONS:
+  1. RL agents provide adaptive decision-making based on system context
+  2. Use DQN for more complex state-action relationships
+  3. Use Contextual Bandit for interpretability and faster training
+  4. Monitor fraud catch rate to ensure > 99% recall
+  5. Periodically retrain to adapt to changing fraud patterns

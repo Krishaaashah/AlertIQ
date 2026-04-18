@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+node_modules/
+
+# Data (too large for git)
+data/PaySim.csv
+
+# Trained models and heavy outputs (reproducible via pipeline)
+models/*.pkl
+outputs/rl_outputs/*.pkl
+outputs/*.csv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp files
+*.tmp
+~$*
+
+# Old project artifacts
+AlertIQ.zip
+AlertIQ/
