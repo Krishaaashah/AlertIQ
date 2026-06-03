@@ -1,79 +1,116 @@
-# AlertIQ: Risk-Constrained Reinforcement Learning Framework for Adaptive AML Alert Governance
+# AlertIQ
 
-> An intelligent, multi-layered AI system that optimizes AML alert handling by learning **when to suppress false positives and when to escalate real threats** — using reinforcement learning at the decision layer.
+Risk-constrained reinforcement learning for adaptive AML alert governance.
 
----
+AlertIQ is an end-to-end AML alert suppression and escalation system. It combines rule-based monitoring, analyst-feedback simulation, calibrated fraud-risk modeling, reinforcement learning, drift detection, explainability, a FastAPI backend, and a React dashboard.
+
+The goal is simple: reduce false-positive analyst workload while protecting fraud recall and keeping every decision explainable enough for audit review.
+
+![AlertIQ intelligent AML governance visual](docs/readme-assets/hero-ai-governance.png)
 
 ## Problem Statement
 
-Anti-Money Laundering (AML) monitoring systems intentionally **over-alert** because missing a true fraud case is catastrophically costly. This floods analysts with alerts, the vast majority of which are **false positives** (~95-99%).
+AML systems generate a huge number of alerts, and almost all of them are false positives. Analysts spend time reviewing non-fraud cases, productivity drops, and the risk of missing real fraud increases.
 
-```
-Transaction Data → Rule-Based Monitoring → Thousands of Alerts → Human Review → Most dismissed
-```
+![Problem statement: AML alert fatigue](docs/readme-assets/problem-alert-fatigue.png)
 
-**AlertIQ solves this** by learning from historical patterns to intelligently suppress benign alerts while preserving near-perfect fraud recall.
+![AlertIQ complete system architecture](docs/readme-assets/architecture.png)
 
----
+## Why AlertIQ
 
-## Architecture
+Traditional AML systems intentionally over-alert because missing a true fraud case is far more expensive than reviewing a benign transaction. That safety-first posture creates severe alert fatigue: analysts spend most of their time dismissing false positives.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    AlertIQ Pipeline                             │
-├─────────────┬───────────────┬──────────────┬───────────────────┤
-│  Phase 2    │   Phase 3     │   Phase 4    │   Phase 5 & 6     │
-│  Data &     │   Suppression │   RL Decision│   Safety &        │
-│  Alerts     │   Model       │   Policy     │   Deployment      │
-├─────────────┼───────────────┼──────────────┼───────────────────┤
-│ PaySim Data │ Cost-Sensitive│ DQN Agent    │ Drift Detection   │
-│ Rule Engine │ LogReg +      │ Contextual   │ (PSI + KL)        │
-│ (4 Rules)   │ Platt Scaling │ Bandit Agent │                   │
-│ Analyst Sim │               │              │ Explainability    │
-│ Trust Score │ Calibrated    │ ε-Greedy     │ Engine            │
-│             │ Probabilities │ Exploration  │                   │
-│ Train/Test  │               │ vs Static    │ FastAPI Backend   │
-│ Split       │ Threshold     │ Baseline     │                   │
-│             │ Evaluation    │ Comparison   │ REST API          │
-└─────────────┴───────────────┴──────────────┴───────────────────┘
-```
+AlertIQ treats alert governance as a decision problem instead of only a classification problem. A calibrated model estimates fraud probability, and a reinforcement learning policy learns when to suppress low-risk alerts or escalate cases for review under an asymmetric reward structure.
 
----
+![Fraud concentration and transaction insights](docs/readme-assets/fraud-concentration.png)
 
-## Key Features
+![Transaction insights from PaySim analysis](docs/readme-assets/transaction-insights.png)
 
-| Feature | Description |
-|---|---|
-| **Rule-Based Alert Engine** | 4 configurable rules mimicking real AML monitoring |
-| **Analyst Trust Simulation** | Junior/Senior analysts with evolving trust scores |
-| **Cost-Sensitive ML** | Logistic Regression with 50:1 fraud miss penalty |
-| **Platt Calibration** | CalibratedClassifierCV for reliable probabilities |
-| **DQN Agent** | Deep Q-Network with experience replay + target network |
-| **Contextual Bandit** | Interpretable linear agent with feature weights |
-| **Asymmetric Rewards** | -50 for suppressing fraud vs +1 for suppressing FP |
-| **Drift Detection** | PSI + KL Divergence with automatic fallback mode |
-| **Explainability** | Human-readable, audit-ready decision explanations |
-| **REST API** | FastAPI backend with Swagger docs |
+## Core Results
 
----
+| Area | Result |
+| --- | --- |
+| Raw dataset | 6.36M PaySim transactions |
+| Rule alerts generated | 2.05M alerts |
+| Fraud capture from rules | 96.48% |
+| ML model | Cost-sensitive Logistic Regression + Platt calibration |
+| ROC-AUC | 0.9961 |
+| Best static threshold | 0.80 |
+| Fraud recall at threshold | 0.9933 |
+| False-positive reduction at threshold | 0.9627 |
+| RL fraud catch rate | 0.9748 |
+| RL false-positive reduction | 0.9788 |
+| RL workload savings | 0.9751 |
+
+## Objectives
+
+![Objectives and success criteria](docs/readme-assets/objectives-success-criteria.png)
+
+The project success criteria are:
+
+- Capture at least 95% fraud using rule-based detection.
+- Build an ML suppression model to reduce false alerts.
+- Reduce workload by at least 90%.
+- Maintain high fraud recall for compliance safety.
+- Add reinforcement learning, drift detection, API deployment, and dashboard visibility.
+
+## 5-Phase Pipeline
+
+![AlertIQ 5-phase pipeline execution](docs/readme-assets/pipeline.png)
+
+1. **Data and rules**
+   Load PaySim transactions, engineer AML features, and generate rule-based alerts.
+
+2. **ML suppression**
+   Train a cost-sensitive suppression model with calibrated fraud probabilities.
+
+3. **RL optimization**
+   Build the alert decision environment and train a DQN policy against static thresholds.
+
+4. **Drift and safety**
+   Monitor PSI and KL divergence, then trigger fallback safety behavior under critical drift.
+
+5. **API and deployment**
+   Serve alert decisions through FastAPI and expose monitoring through the React dashboard.
+
+## System Components
+
+| Layer | What it does |
+| --- | --- |
+| Rule engine | Generates AML alerts from high-value, burst, risky-type, and balance-drain rules |
+| Analyst simulator | Creates labeled analyst feedback with junior/senior trust scoring |
+| Suppression model | Produces calibrated `prob_fraud` values for the decision layer |
+| Threshold evaluator | Benchmarks static gating thresholds from 0.50 to 0.99 |
+| RL environment | Models alert governance as suppress/escalate decisions with asymmetric costs |
+| DQN agent | Learns adaptive suppression policy using replay and target network stabilization |
+| Contextual bandit | Provides a lightweight interpretable baseline |
+| Drift detector | Tracks PSI and KL divergence for safety monitoring |
+| Explainability engine | Produces audit-readable decision explanations |
+| FastAPI backend | Serves evaluation, drift, model, and pipeline endpoints |
+| React dashboard | Displays live metrics, charts, research flow, and model status |
 
 ## Quick Start
 
-### 1. Setup
+## Setup
+
+### Backend Setup
 
 ```bash
-# Clone and install
-cd RL_Project
+git clone https://github.com/sahilawatramani/AlertIQ.git
+cd AlertIQ
+
 python -m venv venv
-venv\Scripts\activate        # Windows
+venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Place Data
+Download the PaySim dataset from Kaggle and place it at:
 
-Download [PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1) and place `PaySim.csv` in `data/`.
+```text
+data/PaySim.csv
+```
 
-### 3. Run Full Pipeline
+Run the complete pipeline:
 
 ```bash
 python run_all.py
@@ -82,163 +119,161 @@ python run_all.py
 Or run phases individually:
 
 ```bash
-python run_phase2.py          # Data → Alerts → Analyst Sim → Split
-python run_phase3.py          # Train suppression model
-python run_phase4_rl.py       # Train RL agents
-python run_phase5_drift.py    # Test drift detection
+python run_eda.py
+python run_phase2.py
+python run_phase3.py
+python run_phase4_rl.py
+python run_phase5_drift.py
 ```
 
-### 4. Start API
+Start the API:
 
 ```bash
 python -m uvicorn api.main:app --reload --port 8000
 ```
 
-Then visit: [http://localhost:8000/docs](http://localhost:8000/docs)
+Open the API docs at [http://localhost:8000/docs](http://localhost:8000/docs).
 
----
+### Frontend
 
-## Project Structure
-
-```
-RL_Project/
-├── run_phase2.py              # Data pipeline runner
-├── run_phase3.py              # Model training runner
-├── run_phase4_rl.py           # RL training runner
-├── run_phase5_drift.py        # Drift testing runner
-├── run_all.py                 # Full pipeline orchestrator
-├── evaluate_metrics.py        # Comprehensive metrics evaluation
-├── requirements.txt
-├── README.md
-│
-├── src/                       # Core library
-│   ├── __init__.py
-│   ├── config.py              # All configuration constants
-│   ├── data_loader.py         # Load & clean PaySim
-│   ├── alert_rules.py         # Rule-based alert generation (R1-R4)
-│   ├── analyst_simulator.py   # Analyst feedback with trust scoring
-│   ├── dataset_builder.py     # Stratified train/test split
-│   ├── suppression_model.py   # Cost-sensitive LogReg + Platt calibration
-│   ├── gating_evaluator.py    # Static threshold evaluation
-│   ├── metrics.py             # Metrics utilities
-│   ├── rl_environment.py      # MDP environment (state/action/reward)
-│   ├── rl_agent.py            # DQN + Contextual Bandit agents
-│   ├── rl_trainer.py          # Training + policy comparison
-│   ├── rl_pipeline.py         # End-to-end RL pipeline
-│   ├── drift_detector.py      # PSI + KL drift detection + fallback
-│   └── explainability.py      # Decision explanation engine
-│
-├── api/                       # FastAPI backend
-│   ├── __init__.py
-│   ├── main.py                # App entry point + model loading
-│   ├── schemas.py             # Pydantic request/response models
-│   └── routes/
-│       ├── alerts.py          # POST /api/alerts/evaluate, /batch
-│       ├── pipeline.py        # POST /api/pipeline/run
-│       ├── drift.py           # POST /api/drift/check, /simulate
-│       └── models.py          # GET /api/models/info, /comparison
-│
-├── data/                      # Raw dataset
-│   └── PaySim.csv
-├── models/                    # Trained models
-│   └── suppression_model.pkl
-└── outputs/                   # Pipeline outputs
-    ├── train_feedback.csv
-    ├── test_feedback.csv
-    ├── threshold_report.csv
-    └── rl_outputs/
-        ├── dqn_agent.pkl
-        ├── bandit_agent.pkl
-        ├── policy_comparison.csv
-        ├── training_curves.png
-        └── evaluation_report.txt
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
----
+The Vite development server will print the local dashboard URL, usually [http://localhost:5173](http://localhost:5173).
 
-## MDP Formulation
+## Phase Outputs
 
-| Component | Details |
-|---|---|
-| **State** | `[prob_fraud, rule_count_norm, amount_norm, fraud_rate, workload_level]` |
-| **Actions** | `0 = SUPPRESS`, `1 = ESCALATE` |
-| **Reward** | Suppress Fraud: **-50**, Suppress Benign: **+1**, Escalate Fraud: **+1**, Escalate Benign: **-0.1** |
-| **Objective** | Maximize cumulative reward while maintaining ≥99% fraud recall |
+### Phase 1: Rule-Based Alert Engine
 
----
+![Phase 1 rule-based implementation](docs/readme-assets/phase1-rule-engine.png)
 
-## API Endpoints
+![Phase 1 measured results](docs/readme-assets/phase1-results.png)
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/` | Health check |
-| `GET` | `/health` | Detailed health status |
-| `POST` | `/api/alerts/evaluate` | Evaluate single alert |
-| `POST` | `/api/alerts/batch` | Evaluate batch of alerts |
-| `GET` | `/api/alerts/stats` | System statistics |
+Phase 1 loads PaySim transactions, engineers features, applies AML rules, and creates train/test alert feedback datasets.
+
+### Phase 2: ML Suppression Model
+
+![Phase 2 ML suppression model](docs/readme-assets/phase2-ml-model.png)
+
+![Phase 2 measured results](docs/readme-assets/phase2-results.png)
+
+Phase 2 trains the calibrated suppression model and evaluates thresholds for fraud recall, false-positive reduction, and workload savings.
+
+### Phase 3: Reinforcement Learning
+
+![Phase 3 reinforcement learning](docs/readme-assets/phase3-rl.png)
+
+Phase 3 trains the DQN policy and compares it against static thresholds and a contextual bandit baseline.
+
+### Phase 4: Drift Detection and Safety
+
+![Automated drift detection](docs/readme-assets/drift-detection.png)
+
+Phase 4 monitors incoming data distribution shifts using PSI and KL divergence, then activates fallback behavior when drift becomes critical.
+
+### Phase 5: MLOps and Deployment
+
+![End-to-end MLOps deployment](docs/readme-assets/mlops-deployment.png)
+
+Phase 5 exposes the backend API, dashboard, model information, drift endpoints, and deployment-ready monitoring surfaces.
+
+## API Surface
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | Root health check |
+| `GET` | `/health` | Detailed service health |
+| `POST` | `/api/alerts/evaluate` | Evaluate one alert |
+| `POST` | `/api/alerts/batch` | Evaluate alerts in batch |
+| `GET` | `/api/alerts/stats` | Alert statistics |
 | `POST` | `/api/pipeline/run` | Trigger pipeline execution |
 | `GET` | `/api/pipeline/status` | Pipeline status |
-| `GET` | `/api/pipeline/results` | Latest results |
-| `POST` | `/api/drift/check` | Run drift detection |
-| `POST` | `/api/drift/simulate` | Simulate drift (demo) |
-| `GET` | `/api/drift/status` | Drift monitoring status |
+| `GET` | `/api/pipeline/results` | Latest pipeline results |
+| `POST` | `/api/drift/check` | Check drift on incoming data |
+| `POST` | `/api/drift/simulate` | Simulate drift scenarios |
+| `GET` | `/api/drift/status` | Current drift status |
 | `GET` | `/api/models/info` | Model metadata |
-| `GET` | `/api/models/comparison` | RL vs baseline results |
-| `GET` | `/api/models/training-curves` | Training curves image |
+| `GET` | `/api/models/comparison` | RL vs baseline comparison |
+| `GET` | `/api/models/training-curves` | Training curve image |
 
----
+## RL Formulation
 
-## Configuration
+| Component | Definition |
+| --- | --- |
+| State | `[prob_fraud, rule_count_norm, amount_norm, fraud_rate, workload_level]` |
+| Actions | `0 = SUPPRESS`, `1 = ESCALATE` |
+| Reward | Suppress fraud: `-50`, suppress benign: `+1`, escalate fraud: `+1`, escalate benign: `-0.1` |
+| Objective | Maximize cumulative reward while preserving high fraud recall |
 
-All parameters live in `src/config.py`:
+## Folder Structure
 
-```python
-# Reward structure
-RL_REWARD_SUPPRESS_FRAUD = -50.0    # CATASTROPHIC
-RL_REWARD_SUPPRESS_BENIGN = 1.0     # Desired
-RL_REWARD_ESCALATE_FRAUD = 1.0      # Correct
-RL_REWARD_ESCALATE_BENIGN = -0.1    # Acceptable
-
-# Drift thresholds
-DRIFT_PSI_WARNING = 0.1
-DRIFT_PSI_CRITICAL = 0.25
-
-# Cost sensitivity
-MISSED_FRAUD_COST = 50              # 50:1 cost ratio
+```text
+AlertIQ/
+|-- api/                         # FastAPI backend
+|   |-- main.py
+|   |-- schemas.py
+|   `-- routes/
+|-- frontend/                    # React + Vite dashboard
+|   |-- src/
+|   `-- package.json
+|-- src/                         # Core ML/RL pipeline
+|   |-- alert_rules.py
+|   |-- analyst_simulator.py
+|   |-- data_loader.py
+|   |-- dataset_builder.py
+|   |-- suppression_model.py
+|   |-- rl_agent.py
+|   |-- rl_environment.py
+|   |-- rl_trainer.py
+|   |-- drift_detector.py
+|   `-- explainability.py
+|-- outputs/                     # Generated charts and reports
+|-- docs/readme-assets/          # Images extracted from the project PPTX
+|-- run_all.py
+|-- run_eda.py
+|-- run_phase2.py
+|-- run_phase3.py
+|-- run_phase4_rl.py
+|-- run_phase5_drift.py
+|-- evaluate_metrics.py
+`-- requirements.txt
 ```
 
----
+## Business Impact
+
+![Business impact](docs/readme-assets/business-impact.png)
+
+![Fraud coverage](docs/readme-assets/fraud-coverage.png)
+
+![System reliability](docs/readme-assets/system-reliability.png)
+
+![Adaptive learning](docs/readme-assets/adaptive-learning.png)
 
 ## Technology Stack
 
-- **ML**: scikit-learn (Logistic Regression, CalibratedClassifierCV)
-- **RL**: PyTorch (DQN), NumPy (Contextual Bandit)
-- **Backend**: FastAPI + Uvicorn
-- **Data**: PaySim synthetic financial dataset
-- **Visualization**: Matplotlib, Seaborn
-- **Python**: 3.8+
+| Area | Tools |
+| --- | --- |
+| Machine learning | scikit-learn, NumPy, pandas |
+| Reinforcement learning | PyTorch |
+| Calibration and evaluation | Platt scaling, ROC-AUC, PR curves, confusion analysis |
+| Drift monitoring | PSI, KL divergence |
+| Backend | FastAPI, Uvicorn, Pydantic |
+| Frontend | React, Vite |
+| Visualization | Matplotlib, Seaborn |
 
----
+## Project Team
 
-## Novelty
-
-This project is **not** a standalone fraud classifier. Its contribution is a **system-level integration**:
-
-1. Rule-based alert generation (realistic AML simulation)
-2. Analyst feedback learning with trust scoring
-3. Cost-sensitive probability modeling with Platt calibration
-4. **RL-based decision optimization** (DQN + Contextual Bandit)
-5. Drift detection with automatic safety fallback
-6. Compliance-ready explainability
-7. Production-grade REST API
-
-The RL agent replaces static thresholds with an adaptive policy that learns contextually optimal suppression decisions.
-
----
+- Krisha Shah - 24070126512
+- Sahil Awatramani - 23070126112
+- Janhavi Doijad - 23070126153
+- Pranjali Vishwakarma - 23070126092
 
 ## References
 
-- Mnih et al., "Human-level control through deep reinforcement learning", Nature 2015 (DQN)
-- Li et al., "A contextual-bandit approach to personalized news article recommendation", JMLR 2010
-- Elkan, "The foundations of cost-sensitive learning", SIGKDD 2001
-- PaySim: E. Lopez-Rojas, "Applying PAYSIM financial simulator", 2016
+- Mnih et al., "Human-level control through deep reinforcement learning", Nature, 2015.
+- Li et al., "A contextual-bandit approach to personalized news article recommendation", JMLR, 2010.
+- Elkan, "The foundations of cost-sensitive learning", SIGKDD, 2001.
+- PaySim: E. Lopez-Rojas, "Applying PAYSIM financial simulator", 2016.
