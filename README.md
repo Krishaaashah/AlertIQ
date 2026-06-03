@@ -6,15 +6,12 @@ AlertIQ is an end-to-end AML alert suppression and escalation system. It combine
 
 The goal is simple: reduce false-positive analyst workload while protecting fraud recall and keeping every decision explainable enough for audit review.
 
-![AlertIQ intelligent AML governance visual](docs/readme-assets/hero-ai-governance.png)
 
 ## Problem Statement
 
 AML systems generate a huge number of alerts, and almost all of them are false positives. Analysts spend time reviewing non-fraud cases, productivity drops, and the risk of missing real fraud increases.
 
-![Problem statement: AML alert fatigue](docs/readme-assets/problem-alert-fatigue.png)
-
-![AlertIQ complete system architecture](docs/readme-assets/architecture.png)
+<img width="2366" height="902" alt="image" src="https://github.com/user-attachments/assets/f26f6952-2bd1-4307-8ceb-9a86bae99911" />
 
 ## Why AlertIQ
 
@@ -22,9 +19,7 @@ Traditional AML systems intentionally over-alert because missing a true fraud ca
 
 AlertIQ treats alert governance as a decision problem instead of only a classification problem. A calibrated model estimates fraud probability, and a reinforcement learning policy learns when to suppress low-risk alerts or escalate cases for review under an asymmetric reward structure.
 
-![Fraud concentration and transaction insights](docs/readme-assets/fraud-concentration.png)
-
-![Transaction insights from PaySim analysis](docs/readme-assets/transaction-insights.png)
+<img width="1305" height="737" alt="image" src="https://github.com/user-attachments/assets/c5ca3cae-ace5-4562-87b0-a826452dd0d3" />
 
 ## Core Results
 
@@ -43,8 +38,8 @@ AlertIQ treats alert governance as a decision problem instead of only a classifi
 | RL workload savings | 0.9751 |
 
 ## Objectives
+<img width="792" height="726" alt="image" src="https://github.com/user-attachments/assets/dcd3e367-9dbf-4440-ae8c-9651560d9887" />
 
-![Objectives and success criteria](docs/readme-assets/objectives-success-criteria.png)
 
 The project success criteria are:
 
@@ -56,7 +51,9 @@ The project success criteria are:
 
 ## 5-Phase Pipeline
 
-![AlertIQ 5-phase pipeline execution](docs/readme-assets/pipeline.png)
+<img width="2708" height="1688" alt="image" src="https://github.com/user-attachments/assets/08e90fef-7986-4182-81a8-5967e40576d3" />
+<img width="2544" height="1688" alt="image" src="https://github.com/user-attachments/assets/adae6162-c96a-4cc9-9de4-f0c5b9d0725f" />
+
 
 1. **Data and rules**
    Load PaySim transactions, engineer AML features, and generate rule-based alerts.
@@ -148,35 +145,38 @@ The Vite development server will print the local dashboard URL, usually [http://
 
 ### Phase 1: Rule-Based Alert Engine
 
-![Phase 1 rule-based implementation](docs/readme-assets/phase1-rule-engine.png)
+<img width="1332" height="464" alt="image" src="https://github.com/user-attachments/assets/c0d3bd0e-8208-4357-abb1-5e6d35077765" />
+<img width="990" height="330" alt="image" src="https://github.com/user-attachments/assets/1e43b46d-e847-4c67-a5ba-e4440cc6fedb" />
 
-![Phase 1 measured results](docs/readme-assets/phase1-results.png)
 
 Phase 1 loads PaySim transactions, engineers features, applies AML rules, and creates train/test alert feedback datasets.
 
 ### Phase 2: ML Suppression Model
 
-![Phase 2 ML suppression model](docs/readme-assets/phase2-ml-model.png)
+<img width="1863" height="794" alt="image" src="https://github.com/user-attachments/assets/00b5ff68-f376-4c4e-a01f-1bd28f2a5ff0" />
+<img width="594" height="462" alt="image" src="https://github.com/user-attachments/assets/788d12c9-b84e-4a80-8e92-f6ab685adc4f" />
+<img width="1767" height="742" alt="image" src="https://github.com/user-attachments/assets/e781bc01-fdac-4db2-b6a6-75e86be50b7d" />
+<img width="1811" height="716" alt="image" src="https://github.com/user-attachments/assets/f7199043-8444-447b-8a43-dcf94d246485" />
 
-![Phase 2 measured results](docs/readme-assets/phase2-results.png)
 
 Phase 2 trains the calibrated suppression model and evaluates thresholds for fraud recall, false-positive reduction, and workload savings.
 
 ### Phase 3: Reinforcement Learning
-
-![Phase 3 reinforcement learning](docs/readme-assets/phase3-rl.png)
+<img width="1853" height="760" alt="image" src="https://github.com/user-attachments/assets/e9b01d2a-78f1-4d5e-b559-6e54432c17a4" />
 
 Phase 3 trains the DQN policy and compares it against static thresholds and a contextual bandit baseline.
 
 ### Phase 4: Drift Detection and Safety
 
-![Automated drift detection](docs/readme-assets/drift-detection.png)
+<img width="548" height="292" alt="image" src="https://github.com/user-attachments/assets/49c7c99b-5668-49ef-8cd1-193d99f9514d" />
+
 
 Phase 4 monitors incoming data distribution shifts using PSI and KL divergence, then activates fallback behavior when drift becomes critical.
 
 ### Phase 5: MLOps and Deployment
 
-![End-to-end MLOps deployment](docs/readme-assets/mlops-deployment.png)
+<img width="878" height="354" alt="image" src="https://github.com/user-attachments/assets/ee191c65-b58d-4cae-9c3e-c71992c569c2" />
+
 
 Phase 5 exposes the backend API, dashboard, model information, drift endpoints, and deployment-ready monitoring surfaces.
 
@@ -242,15 +242,6 @@ AlertIQ/
 `-- requirements.txt
 ```
 
-## Business Impact
-
-![Business impact](docs/readme-assets/business-impact.png)
-
-![Fraud coverage](docs/readme-assets/fraud-coverage.png)
-
-![System reliability](docs/readme-assets/system-reliability.png)
-
-![Adaptive learning](docs/readme-assets/adaptive-learning.png)
 
 ## Technology Stack
 
@@ -264,12 +255,6 @@ AlertIQ/
 | Frontend | React, Vite |
 | Visualization | Matplotlib, Seaborn |
 
-## Project Team
-
-- Krisha Shah - 24070126512
-- Sahil Awatramani - 23070126112
-- Janhavi Doijad - 23070126153
-- Pranjali Vishwakarma - 23070126092
 
 ## References
 
