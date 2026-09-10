@@ -21,6 +21,17 @@ models/*.pkl
 outputs/rl_outputs/*.pkl
 outputs/*.csv
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment / secrets
+.env
+
+# Frontend build output
+frontend/dist/
+
 # IDE
 .idea/
 .vscode/

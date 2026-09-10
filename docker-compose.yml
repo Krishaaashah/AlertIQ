@@ -1,0 +1,35 @@
+# AlertIQ — docker-compose
+#
+# Brings up the FastAPI backend and the React dashboard together.
+#
+# Usage:
+#   docker compose up --build
+#
+# Backend:  http://localhost:8000  (docs at /docs)
+# Frontend: http://localhost:5173
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount generated pipeline artifacts so the API can pick up a model
+      # trained outside the container (see README "Full pipeline" section).
+      - ./outputs:/app/outputs
+      - ./models:/app/models
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000

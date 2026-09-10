@@ -1,16 +1,45 @@
-# React + Vite
+# AlertIQ Dashboard (frontend)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite dashboard for the AlertIQ backend — live alert metrics,
+model status, drift status, and a research/architecture walkthrough.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+Opens at [http://localhost:5173](http://localhost:5173) by default. The
+dashboard expects the FastAPI backend to be running at
+`http://localhost:8000` (see the root `README.md` to start it, or run
+`docker compose up` from the project root to start both together).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Structure
 
-## Expanding the ESLint configuration
+```text
+src/
+|-- App.jsx                  # Top-level layout/routing
+|-- components/
+|   |-- Charts.jsx            # Metric charts (recharts)
+|   |-- LiveFeed.jsx          # Live alert decision feed
+|   |-- NeuralScene.jsx       # 3D visualization (react-three-fiber)
+|   `-- ResearchPage.jsx      # Architecture / methodology walkthrough
+`-- data/
+    `-- simulationData.js     # Local demo data for offline/no-backend view
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Build
+
+```bash
+npm run build
+```
+
+Outputs static files to `dist/`, served by `frontend/Dockerfile` via nginx
+in the Docker setup (see the root `docker-compose.yml`).
+
+## Lint
+
+```bash
+npm run lint
+```

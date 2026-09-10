@@ -19,10 +19,17 @@ Action Space:
   - 1: ESCALATE (send to analyst for review)
 
 Reward Function (Asymmetric):
-  - Suppress fraud: -50 (catastrophic penalty)
-  - Suppress benign: +1 (desired outcome)
-  - Escalate fraud: +1 (correctly routed)
-  - Escalate benign: -0.1 (small cost - analyst time)
+  Values below match the illustrative version of the reward function.
+  The values actually used at runtime live in src/config.py and currently
+  are: suppress fraud = -500, suppress benign = +1, escalate fraud = +5,
+  escalate benign = -0.5. Both versions share the same design principle —
+  missing fraud is penalized far more heavily than any other outcome is
+  rewarded — only the exact magnitudes differ. See tests/test_config.py
+  for the invariant this is checked against.
+  - Suppress fraud: catastrophic penalty (dominant term)
+  - Suppress benign: small positive reward (desired outcome)
+  - Escalate fraud: positive reward (correctly routed)
+  - Escalate benign: small negative cost (analyst time)
 """
 
 import numpy as np
