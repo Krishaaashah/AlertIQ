@@ -21,22 +21,28 @@ compliance analysts, without letting a single extra fraud case through.**
 1. [Problem Statement](#problem-statement)
 2. [Approach](#approach)
 3. [Core Results](#core-results)
-4. [Architecture](#architecture)
+4. [Architecture & Decision Flow](#architecture--decision-flow)
 5. [The 5-Phase Pipeline](#the-5-phase-pipeline)
 6. [System Components](#system-components)
 7. [Repository Structure](#repository-structure)
-8. [Getting Started](#getting-started)
-9. [Running the Tests](#running-the-tests)
-10. [Running the Examples](#running-the-examples)
-11. [Docker](#docker)
-12. [API Reference](#api-reference)
-13. [RL Formulation](#rl-formulation)
-14. [Phase Outputs (Charts)](#phase-outputs-charts)
-15. [Technology Stack](#technology-stack)
-16. [Configuration](#configuration)
-17. [Limitations & Future Work](#limitations--future-work)
-18. [References](#references)
-19. [License](#license)
+8. [Reference Guide to Run and Use the Application](#reference-guide-to-run-and-use-the-application)
+   - [1. Prerequisites](#1-prerequisites)
+   - [2. Installation](#2-installation)
+   - [3. Running the Full Pipeline](#3-running-the-full-pipeline)
+   - [4. Running the Test Suite](#4-running-the-test-suite)
+   - [5. Running the API](#5-running-the-api)
+   - [6. Running the Frontend Dashboard](#6-running-the-frontend)
+   - [7. Docker Deployment (All-in-One)](#7-docker-all-in-one-deployment)
+   - [Dataset Setup (Sample vs. Full Dataset)](#dataset-setup)
+9. [Running the Examples](#running-the-examples)
+10. [API Reference](#api-reference)
+11. [RL Formulation](#rl-formulation)
+12. [Phase Outputs (Charts)](#phase-outputs-charts)
+13. [Technology Stack](#technology-stack)
+14. [Configuration](#configuration)
+15. [Limitations & Future Work](#limitations--future-work)
+16. [References](#references)
+17. [License](#license)
 
 ---
 
@@ -101,202 +107,227 @@ Full numeric breakdown, including the static-threshold sweep the RL policy
 is benchmarked against, is in
 [`outputs/rl_outputs/evaluation_report.txt`](outputs/rl_outputs/evaluation_report.txt).
 
-## Architecture
+## Architecture & Decision Flow
+
+### End-to-End System Architecture
 
 ```mermaid
 flowchart TB
-    subgraph Ingestion
-        A["Raw transactions\n(PaySim / live feed)"]
+    subgraph Ingestion["Data Ingestion"]
+        A["Raw Transactions\n(PaySim / Live Transaction Feed)"]
     end
 
-    subgraph Phase1["Phase 1 — Rule Engine"]
-        A --> B["alert_rules.py\nR1 high-value / R2 burst /\nR3 risky type / R4 balance drain"]
+    subgraph Phase1["Phase 1 — Rule Engine & EDA"]
+        A --> B["alert_rules.py\nR1: High-Value | R2: Burst\nR3: Risky Type | R4: Balance Drain"]
+        B --> EDA["run_eda.py\nData Profiling & Metrics"]
     end
 
-    subgraph Phase2["Phase 2 — ML Suppression"]
-        B -->|"~2M alerts"| C["suppression_model.py\nCost-sensitive LR + Platt calibration"]
-        C --> D["prob_fraud (calibrated)"]
+    subgraph Phase2["Phase 2 — Alert & Simulation Pipeline"]
+        B -->|"~2.05M Alerts"| C["analyst_simulator.py\nJunior / Senior Trust Tiers"]
+        C --> D["dataset_builder.py\nTrain / Test Dataset Splits"]
     end
 
-    subgraph Phase3["Phase 3 — RL Decision"]
-        D --> E["rl_environment.py\nstate = prob_fraud, rule_count,\namount, fraud_rate, workload"]
-        E --> F{"DQN Agent /\nAdaptiveThresholdPolicy"}
-        F -->|"action=0"| G["SUPPRESS"]
-        F -->|"action=1"| H["ESCALATE to analyst"]
+    subgraph Phase3["Phase 3 — Calibrated ML Suppression"]
+        D --> E["suppression_model.py\nCost-Sensitive Logistic Regression\n+ Platt Calibration"]
+        E --> F["gating_evaluator.py\nStatic Threshold Benchmark (0.50 - 0.99)"]
+        E --> G["prob_fraud (Calibrated Probability)"]
     end
 
-    subgraph Phase5["Phase 5 — Safety"]
-        I["drift_detector.py\nPSI / KL divergence"] -.->|"critical drift forces\nescalation bias"| F
+    subgraph Phase4["Phase 4 — RL Decision Policy"]
+        G --> H["rl_environment.py\nState: prob_fraud, rule_count,\namount, fraud_rate, workload"]
+        H --> I{"RL Agent\n(DQN / Contextual Bandit)"}
+        I -->|"Action = 0"| J["SUPPRESS (Auto-Dismiss)"]
+        I -->|"Action = 1"| K["ESCALATE (Analyst Queue)"]
     end
 
-    subgraph Explain["Explainability"]
-        G --> J["explainability.py\naudit-readable reason"]
-        H --> J
+    subgraph Phase5["Phase 5 — Drift Detection & Safety"]
+        L["drift_detector.py\nPSI & KL Divergence Monitor"] -.->|"Critical Drift (>0.25 PSI)\nForces Precautionary Escalation"| I
     end
 
-    subgraph Serve["Serving Layer"]
-        J --> K["FastAPI (api/)"]
-        K --> L["React Dashboard\n(frontend/)"]
-        K --> M["External systems\n(REST clients)"]
+    subgraph Explain["Explainability Engine"]
+        J --> M["explainability.py\nAudit-Ready Reason & Risk Factors"]
+        K --> M
+    end
+
+    subgraph Serve["Serving & Interface Layer"]
+        M --> N["FastAPI Backend (api/)"]
+        N --> O["React + Vite 3D Dashboard (frontend/)"]
+        N --> P["External Banking REST Clients"]
     end
 ```
 
-The same flow underpins both the offline batch pipeline (`run_all.py`) and
-the live API (`api/main.py`) — the API simply runs one alert at a time
-through the same functions the pipeline scripts call in bulk.
+### Alert Decision Lifecycle
+
+```mermaid
+flowchart LR
+    Tx["Incoming Transaction"] --> RuleCheck{"Rule Engine (Phase 1)\nTriggers Alert?"}
+    RuleCheck -- "No Trigger" --> Pass["Pass Transaction\n(No Review Required)"]
+    RuleCheck -- "Alert Generated" --> MLModel["Phase 3: Calibrated ML\nPredicts p_fraud"]
+    
+    MLModel --> DriftGuard{"Phase 5: Drift Check\nDistribution Shift?"}
+    
+    DriftGuard -- "Critical Drift Detected" --> Fallback["Precautionary Safety Bias\n(Action = ESCALATE)"]
+    DriftGuard -- "Distribution Stable" --> RLDecision{"Phase 4: RL Policy\n(DQN Agent)"}
+    
+    RLDecision -- "Action = 0" --> Suppress["SUPPRESS ALERT\n(Workload Reduction)"]
+    RLDecision -- "Action = 1" --> Escalate["ESCALATE ALERT\n(Compliance Review)"]
+    Fallback --> Escalate
+    
+    Suppress --> ExplainEngine["Explainability Engine\n(Audit Trail Generation)"]
+    Escalate --> ExplainEngine
+    
+    ExplainEngine --> LiveAPI["FastAPI / Analyst Dashboard"]
+```
 
 ## The 5-Phase Pipeline
 
-**Phase 1 — Data and rules.** Load PaySim transactions, engineer
-AML-relevant features (transaction bursts, balance-drain ratios, type
-encoding), and apply four interpretable rules to generate the initial
-alert pool. This is the "legacy system" baseline: high recall, terrible
-precision, by design.
+AlertIQ is organized into a modular, 5-phase pipeline that can be executed end-to-end or inspected phase by phase:
 
-**Phase 2 — ML suppression.** Train a cost-sensitive logistic regression
-(50:1 penalty for missing fraud) wrapped in Platt-scaling calibration, so
-its output isn't just a ranking but a genuinely interpretable probability
-— required for the RL state space and for audit explanations downstream.
-
-**Phase 3 — RL optimization.** Model alert governance as a sequential
-decision problem. A Deep Q-Network learns a suppress/escalate policy under
-an asymmetric reward (see [RL Formulation](#rl-formulation)), trained with
-balanced experience replay so the ~0.1% fraud rate doesn't starve learning.
-It's benchmarked against a family of static thresholds and a contextual
-bandit baseline.
-
-**Phase 4 — Drift and safety.** Continuously compare incoming data's
-distribution against the training distribution using PSI and KL
-divergence. On critical drift, the system automatically biases toward
-escalation rather than trusting a model that may no longer reflect
-reality — see `examples/02_drift_detection_demo.py` for this in action.
-
-**Phase 5 — API and deployment.** Serve every decision — with its
-explanation — through FastAPI, and surface live metrics, drift status, and
-policy comparisons through a React dashboard.
+- **Phase 1 — Exploratory Data Analysis & Rule Engine (`run_eda.py`):** Loads PaySim transactions, profiles class distributions and temporal fraud rates, engineers features (transaction bursts, balance-drain ratios, type encoding), and applies four interpretable heuristic rules (R1 High-Value, R2 Burst, R3 Risky Type, R4 Balance Drain) to establish the legacy system baseline.
+- **Phase 2 — Data Pipeline & Feedback Simulation (`run_phase2.py`):** Extracts rule-triggered alerts, simulates realistic analyst investigation feedback with parameterized error rates across junior and senior analyst tiers, and creates reproducible train/test splits in `outputs/`.
+- **Phase 3 — ML Suppression & Threshold Sweeps (`run_phase3.py`):** Trains a cost-sensitive logistic regression model (with a 50:1 penalty for missed fraud) paired with Platt scaling to output well-calibrated posterior probabilities. Benchmarks static decision thresholds from 0.50 to 0.99.
+- **Phase 4 — Reinforcement Learning Decision Policy (`run_phase4_rl.py`):** Formulates alert triage as a Markov Decision Process (MDP). Trains a Deep Q-Network (DQN) with balanced experience replay to prevent sparse fraud signals from starving the agent, benchmarking against static thresholds and contextual bandits.
+- **Phase 5 — Drift Detection & Safety Testing (`run_phase5_drift.py`):** Continuously monitors incoming feature distributions using Population Stability Index (PSI) and Kullback-Leibler (KL) divergence. Simulates distribution shifts and triggers automatic fallback action biasing toward escalation during anomalies.
 
 ## System Components
 
-| Layer | What it does | Source |
-| --- | --- | --- |
-| Rule engine | Generates AML alerts from high-value, burst, risky-type, and balance-drain rules | `src/alert_rules.py` |
-| Analyst simulator | Creates labeled analyst feedback with junior/senior trust scoring | `src/analyst_simulator.py` |
-| Suppression model | Produces calibrated `prob_fraud` values for the decision layer | `src/suppression_model.py` |
-| Threshold evaluator | Benchmarks static gating thresholds from 0.50 to 0.99 | `src/gating_evaluator.py` |
-| RL environment | Models alert governance as suppress/escalate decisions with asymmetric costs | `src/rl_environment.py` |
-| DQN agent | Learns adaptive suppression policy using replay and target network stabilization | `src/rl_agent.py` |
-| Drift detector | Tracks PSI and KL divergence for safety monitoring | `src/drift_detector.py` |
-| Explainability engine | Produces audit-readable decision explanations | `src/explainability.py` |
-| FastAPI backend | Serves evaluation, drift, model, and pipeline endpoints | `api/` |
-| React dashboard | Displays live metrics, charts, research flow, and model status | `frontend/` |
+| Phase / Layer | What it does | Source Code | Output Artifacts |
+| --- | --- | --- | --- |
+| **Phase 1: Rule Engine & EDA** | Generates AML alerts from heuristic rules; produces comprehensive data visualizations | `src/alert_rules.py`<br>`run_eda.py` | `outputs/eda/`<br>`outputs/transaction_type_chart.png` |
+| **Phase 2: Feedback Simulation** | Simulates analyst review tiers (junior/senior) and builds train/test partitions | `src/analyst_simulator.py`<br>`src/dataset_builder.py`<br>`run_phase2.py` | `outputs/train_alerts.csv`<br>`outputs/test_alerts.csv` |
+| **Phase 3: Calibrated ML** | Produces calibrated `prob_fraud` scores and evaluates static gating thresholds | `src/suppression_model.py`<br>`src/gating_evaluator.py`<br>`run_phase3.py` | `models/suppression_model.joblib`<br>`outputs/evaluation/` |
+| **Phase 4: RL Policy Optimization** | Trains DQN and bandit agents under asymmetric reward matrices | `src/rl_agent.py`<br>`src/rl_environment.py`<br>`src/rl_pipeline.py`<br>`run_phase4_rl.py` | `outputs/rl_outputs/`<br>`outputs/rl_outputs/evaluation_report.txt` |
+| **Phase 5: Drift & Safety Guardrails** | Tracks feature drift (PSI/KL) and applies safety escalation overrides | `src/drift_detector.py`<br>`run_phase5_drift.py` | `outputs/evaluation/13_drift_analysis.png` |
+| **Explainability Engine** | Generates human-readable, audit-compliant decision explanations | `src/explainability.py` | Structured explanation payloads |
+| **FastAPI Backend** | Serves single/batch evaluations, drift checks, and metrics via REST | `api/main.py`<br>`api/routes/` | Interactive Swagger UI (`:8000/docs`) |
+| **React + Vite Dashboard** | 3D neural scene, live alert feed, model telemetry, and architecture tour | `frontend/src/` | Interactive web application (`:5173`) |
 
 ## Repository Structure
 
 ```text
 AlertIQ/
-|-- api/                         # FastAPI backend
+|-- api/                         # FastAPI backend service
 |   |-- main.py                  # App entry point, model loading, lifespan
 |   |-- schemas.py                # Pydantic request/response models
 |   `-- routes/                  # alerts.py, pipeline.py, drift.py, models.py
-|-- frontend/                    # React + Vite dashboard
-|   |-- src/
-|   |-- Dockerfile
+|-- frontend/                    # React + Vite interactive dashboard
+|   |-- src/                     # React components, 3D scenes, live feeds
+|   |-- Dockerfile               # Multi-stage Nginx build
 |   `-- package.json
-|-- src/                         # Core ML/RL pipeline
-|   |-- alert_rules.py
-|   |-- analyst_simulator.py
-|   |-- data_loader.py
-|   |-- dataset_builder.py
-|   |-- suppression_model.py
-|   |-- gating_evaluator.py
-|   |-- rl_agent.py
-|   |-- rl_environment.py
-|   |-- rl_trainer.py
-|   |-- rl_pipeline.py
-|   |-- drift_detector.py
-|   |-- explainability.py
-|   |-- metrics.py
-|   `-- config.py                # Single source of truth for all tunables
-|-- tests/                       # pytest suite (32 tests, runs in <1s)
-|-- examples/                    # 4 runnable, self-contained demo scripts
-|-- dataset/                     # Sample data + full-dataset instructions
-|-- config/                      # Deployment env config (.env.example)
-|-- docs/readme-assets/          # Supporting images
+|-- src/                         # Core ML/RL pipeline modules
+|   |-- alert_rules.py           # 4 heuristic AML rules (R1 - R4)
+|   |-- analyst_simulator.py     # Labeled analyst feedback simulation
+|   |-- data_loader.py           # PaySim cleaning and loading
+|   |-- dataset_builder.py       # Alert dataset builder and train/test split
+|   |-- suppression_model.py     # Cost-sensitive logistic regression + Platt scaling
+|   |-- gating_evaluator.py      # Static threshold benchmark (0.50 - 0.99)
+|   |-- rl_agent.py              # DQN and Linear Bandit agents
+|   |-- rl_environment.py        # Gymnasium-compatible AML triage environment
+|   |-- rl_trainer.py            # Experience replay training loops
+|   |-- rl_pipeline.py           # RL orchestrator and comparator
+|   |-- drift_detector.py        # PSI and KL divergence drift monitor
+|   |-- explainability.py        # Audit-ready reasoning engine
+|   |-- metrics.py               # Recall, FP reduction, and cost utilities
+|   `-- config.py                # Central configuration and hyperparameters
+|-- tests/                       # Complete pytest suite (32 tests, runs in <1s)
+|-- examples/                    # 4 runnable, self-contained walkthrough scripts
+|-- dataset/                     # Sample PaySim data + full-dataset instructions
+|-- config/                      # Environment configurations (.env.example)
+|-- docs/readme-assets/          # Architecture and result diagrams
 |-- outputs/                     # Generated charts and evaluation reports
-|-- Dockerfile                   # Backend image
-|-- docker-compose.yml           # Backend + frontend together
-|-- requirements.txt             # Runtime dependencies
-|-- requirements-dev.txt         # + pytest, httpx for testing
-|-- run_all.py                   # Runs the full 5-phase pipeline
-|-- run_eda.py / run_phase2.py / run_phase3.py / run_phase4_rl.py / run_phase5_drift.py
-`-- evaluate_metrics.py
+|-- Dockerfile                   # Python backend container definition
+|-- docker-compose.yml           # Multi-container orchestration (backend + frontend)
+|-- requirements.txt             # Core Python runtime dependencies
+|-- requirements-dev.txt         # Development & test dependencies (pytest, httpx)
+|-- run_all.py                   # Full pipeline orchestrator (Phases 2-5)
+|-- run_eda.py                   # Phase 1: EDA & rule-based alert generation
+|-- run_phase2.py                # Phase 2: Data pipeline & alert simulation
+|-- run_phase3.py                # Phase 3: Calibrated ML suppression & threshold sweep
+|-- run_phase4_rl.py             # Phase 4: RL decision policy training (DQN & Bandit)
+|-- run_phase5_drift.py          # Phase 5: Drift detection & safety guardrail demo
+`-- evaluate_metrics.py          # Comprehensive metrics calculator
 ```
 
-## Getting Started
+---
 
-### Prerequisites
+## Reference Guide to Run and Use the Application
 
-- Python 3.10+
-- Node.js 18+ (for the frontend)
-- ~2 GB free disk space if you download the full PaySim dataset
+### 1. Prerequisites
 
-### Backend setup
+- **Python 3.10+** (required to run the backend and ML/RL pipeline)
+- **Node.js 18+** (if the frontend dashboard is executed)
+- **~2 GB available hard drive space** (to download and store the full PaySim database)
+- **Git**
+- **Docker & Docker Compose** (optional, for all-in-one containerized deployment)
+
+---
+
+### 2. Installation
+
+Clone the repository and set up a Python virtual environment:
 
 ```bash
-git clone <this-repository-url>
+git clone https://github.com/Krishaaashah/AlertIQ
 cd AlertIQ
 
 python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+source venv/bin/activate    # Windows: venv\Scripts\activate
+
 pip install -r requirements.txt
 ```
 
-### Dataset setup
+---
 
-For a **quick look** at the system, you don't need to do anything extra —
-`dataset/sample_paysim.csv` is already included and every example script
-uses it automatically.
+### 3. Running the Full Pipeline
 
-To reproduce the **actual reported metrics**, download the full dataset:
-
-```bash
-# 1. Download PS_20174392719_1491204439457_log.csv from
-#    https://www.kaggle.com/datasets/ealaxi/paysim1
-# 2. Place it at:
-mkdir -p data
-mv ~/Downloads/PS_20174392719_1491204439457_log.csv data/PaySim.csv
-```
-
-See [`dataset/README.md`](dataset/README.md) for the full schema and more detail.
-
-### Run the full pipeline
+You can execute the entire pipeline with a single command:
 
 ```bash
 python run_all.py
 ```
 
-Or run phases individually (useful for debugging or re-running just one stage):
+#### Or phase by phase:
 
 ```bash
-python run_eda.py
-python run_phase2.py
-python run_phase3.py
-python run_phase4_rl.py
-python run_phase5_drift.py
+python run_eda.py           # Phase 1: data exploration + rule-based alerts
+python run_phase2.py        # Phase 2: train + calibrate the ML suppression model (data pipeline)
+python run_phase3.py        # Phase 3: threshold sweep / gating evaluation
+python run_phase4_rl.py     # Phase 4: train and evaluate the RL agent
+python run_phase5_drift.py  # Phase 5: drift detection demo
 ```
 
-### Start the API
+---
+
+### 4. Running the Test Suite
+
+Run the full test suite without needing to download the large dataset or pretrain models:
 
 ```bash
-python -m uvicorn api.main:app --reload --port 8000
+pip install -r requirements-dev.txt
+pytest
 ```
 
-Open the interactive docs at [http://localhost:8000/docs](http://localhost:8000/docs).
-The API starts fine even without a trained model — it falls back to a
-static-threshold decision and a neutral 0.5 probability until you've run
-the pipeline (see [API Reference](#api-reference)).
+> **32 tests run in <1 second** against in-memory fixtures and the bundled sample dataset.
 
-### Start the frontend
+---
+
+### 5. Running the API
+
+Start the FastAPI backend server:
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+- **Interactive API Documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Alternative Redoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
+
+---
+
+### 6. Running the Frontend
+
+Start the React + Vite dashboard:
 
 ```bash
 cd frontend
@@ -304,58 +335,38 @@ npm install
 npm run dev
 ```
 
-The Vite dev server prints the local dashboard URL, usually
-[http://localhost:5173](http://localhost:5173).
+- **Dashboard URL:** [http://localhost:5173](http://localhost:5173)
 
-## Running the Tests
+---
 
-```bash
-pip install -r requirements-dev.txt
-pytest
-```
+### 7. Docker (All-in-One Deployment)
 
-32 tests, running in well under a second, with **no dataset download and
-no trained model required** — everything runs against the synthetic
-sample in `dataset/` and in-memory fixtures. Coverage includes:
-
-| File | What it checks |
-| --- | --- |
-| `tests/test_alert_rules.py` | Rule engine output shape, high-value threshold logic, fraud recall on realistic data |
-| `tests/test_drift_detector.py` | PSI/KL correctness on identical vs. shifted distributions, fallback bias activation |
-| `tests/test_rl_environment.py` | Asymmetric reward values match `src/config.py`, episode bookkeeping, balanced sampling, the adaptive-threshold baseline policy |
-| `tests/test_explainability.py` | Risk classification, template selection, drift-override explanations |
-| `tests/test_config.py` | Safety invariants — e.g. the missed-fraud penalty must always dominate every other reward |
-| `tests/test_api.py` | FastAPI endpoints respond correctly in cold-start (no model loaded) mode |
-
-## Running the Examples
-
-Four scripts in `examples/` walk through the real pipeline code end-to-end
-using the bundled sample dataset — see [`examples/README.md`](examples/README.md)
-for details and sample output. Quick start:
-
-```bash
-python examples/01_rule_engine_walkthrough.py
-python examples/02_drift_detection_demo.py
-python examples/03_decision_explainability_walkthrough.py
-
-# In a separate terminal:
-uvicorn api.main:app --reload --port 8000
-# Then:
-python examples/04_call_api_client.py
-```
-
-## Docker
+To build and run both the FastAPI backend and React frontend together in Docker containers:
 
 ```bash
 docker compose up --build
 ```
 
-This builds and runs the FastAPI backend (`:8000`) and the React
-dashboard (`:5173`) together. Mount `outputs/` and `models/` (already
-wired up in `docker-compose.yml`) if you want the container to serve a
-model trained outside of Docker. See the root [`Dockerfile`](Dockerfile),
-[`frontend/Dockerfile`](frontend/Dockerfile), and
-[`docker-compose.yml`](docker-compose.yml).
+- Backend API is accessible at `http://localhost:8000`
+- Frontend Dashboard is accessible at `http://localhost:5173`
+
+---
+
+### Dataset Setup
+
+- **Quick Start:** For immediate testing, `dataset/sample_paysim.csv` is already included. All example scripts and tests work out-of-the-box.
+- **Full Dataset (for reproducing exact research metrics):**
+  1. Download `PS_20174392719_1491204439457_log.csv` from [Kaggle PaySim Dataset](https://www.kaggle.com/datasets/ealaxi/paysim1).
+  2. Place it in the `data/` directory:
+     ```bash
+     mkdir -p data
+     # Move and rename the downloaded file:
+     mv ~/Downloads/PS_20174392719_1491204439457_log.csv data/PaySim.csv
+     ```
+  3. Run `python run_all.py` to process the full 6.36M transactions.
+  4. See [`dataset/README.md`](dataset/README.md) for full schema details.
+
+---
 
 ## API Reference
 
@@ -413,7 +424,7 @@ payload is used in `examples/04_call_api_client.py` and `tests/test_api.py`):
 ```
 
 (`fraud_probability` is 0.5 here because no trained model was loaded — see
-[Getting Started](#getting-started) to train one and get a calibrated score instead.)
+[Reference Guide to Run and Use the Application](#reference-guide-to-run-and-use-the-application) to train one and get a calibrated score instead.)
 
 ## RL Formulation
 
